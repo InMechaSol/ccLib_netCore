@@ -1067,6 +1067,31 @@ namespace ccLib_netCore
                 }
                 else if (Path.GetExtension(fstring).Equals(".hpp") || Path.GetExtension(fstring).Equals(".h") || Path.GetExtension(fstring).Equals(".ino"))
                 {
+                    if(Path.GetFileName(fstring).Equals("Application_Solution.h"))
+                    {
+                        // copy and modify #include line within
+                        string ftext = File.ReadAllText(fstring);
+
+                        Regex rx = new Regex(@"#define ccGripper_BuildNumber [0-9]+ ");
+                        MatchCollection matches = rx.Matches(ftext);
+                        
+                        if(matches.Count > 0)
+                        {
+                            string[] toks = matches[0].Value.Split(' ');
+                            if(toks.Length > 2)
+                            {
+                                uint buildNum;
+                                if (UInt32.TryParse(toks[2], out buildNum))
+                                {
+                                    ftext = rx.Replace(ftext, toks[0] + " " + toks[1] + " " + (buildNum + 1) + " ");
+                                    File.WriteAllText(fstring, ftext);
+                                }
+                            }
+                        }
+                        
+                        
+                    }
+                    
                     File.Copy(fstring, filestring, true);
 
                 }
