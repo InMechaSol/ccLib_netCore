@@ -9,6 +9,13 @@ using System.Text.RegularExpressions;
 
 namespace ccLib_netCore
 {
+    /// <summary>
+    /// Repository Node Structure
+    /// the Data Structure for repository nodes
+    /// - name
+    /// - push and fetch urls
+    /// - 
+    /// </summary>
     public class RepoNodeStruct
     {
         [Category("Repository Node Structure")]
@@ -16,14 +23,35 @@ namespace ccLib_netCore
         [DisplayName("Name")]
         public string name { get; set; }
         [Category("Repository Node Structure")]
-        [Description("The 'URL' keystring locating the Repository remote origin")]
-        [DisplayName("URL")]
-        public string url { get; set; }
+        [Description("The push 'URL' keystring locating the Repository remote origin")]
+        [DisplayName("URL (push)")]
+        public string pushurl { get; set; }
+        [Category("Repository Node Structure")]
+        [Description("The fetch 'URL' keystring locating the Repository remote origin")]
+        [DisplayName("URL (fetch)")]
+        public string fetchurl { get; set; }
         [Category("Repository Node Structure")]
         [Description("Submodule keystrings of the Repository")]
         [DisplayName("SubModuleNames")]
         public string[] submodnames { get; set; }
+        [Category("Repository Node Structure")]
+        [Description("SubmoduleBranches keystrings of the Repository")]
+        [DisplayName("SubModuleBranchess")]
+        public string[] submodbranches { get; set; }
+        [Category("Repository Node Structure")]
+        [Description("Branches keystrings of the Repository")]
+        [DisplayName("Branches")]
+        public string[] branchnames { get; set; }
+        [Category("Repository Node Structure")]
+        [Description("ActiveBranch keystrings of the Repository")]
+        [DisplayName("ActiveBranch")]
+        public string activebranch { get; set; }
     }
+    /// <summary>
+    /// IMS Universe Configuration Data Structure
+    /// - 3rd Party Binaries Links
+    /// - The config modules list
+    /// </summary>
     public class IMSConfigStruct
     {
         [Category("IMS Configuration Structure")]
@@ -47,6 +75,10 @@ namespace ccLib_netCore
         [DisplayName("Repositories")]
         public List<RepoNodeStruct> Repositories { get; set; }
     }
+    /// <summary>
+    /// GUI TreeNode Data Structure
+    /// - TreeNode elements similar to the .NET TreeNode
+    /// </summary>
     public class guiTreeNode
     {
         [Category("gui Tree Node")]
@@ -74,6 +106,10 @@ namespace ccLib_netCore
         [DisplayName("Nodes")]
         public List<guiTreeNode> Nodes { set; get; }
     }
+    /// <summary>
+    /// Repository Tree Node, is a GUI Tree Node
+    /// - adds Repository Node Data 
+    /// </summary>
     public class repoTreeNode:guiTreeNode
     {
         [Category("repo Tree Node")]
@@ -87,7 +123,11 @@ namespace ccLib_netCore
         [Category("repo Tree Node")]
         [Description("Indication of a 'dirty' working directory")]
         [DisplayName("hasChanges")]
-        public bool hasChanges { set; get; }
+        public bool hasChanges { get { if (changesString != null) { if (changesString != "") { return true; } else return false; } else return false; } }
+        [Category("repo Tree Node")]
+        [Description("list of changes detectected from origin/activebranch")]
+        [DisplayName("changesString")]
+        public string changesString { set; get; }
         [Category("repo Tree Node")]
         [Description("Indication of a working connection to Repository remote origin")]
         [DisplayName("isReachable")]
@@ -106,21 +146,30 @@ namespace ccLib_netCore
             Nodes = new List<guiTreeNode>();
             ParentNodes = new List<guiTreeNode>(2);
             RepoConfig = configStruct;
-            if (parentNode.ParentNodes != null) 
-            { 
-                if (parentNode.ParentNodes.Count > 0) 
-                { 
-                    ParentNodes.Add(parentNode.ParentNodes[0]); 
-                } 
-            }
-            if (ParentNodes.Count == 0)
+            
+            if(parentNode!=null)
+            {
+                if (parentNode.ParentNodes != null)
+                {
+                    if (parentNode.ParentNodes.Count > 0)
+                    {
+                        ParentNodes.Add(parentNode.ParentNodes[0]);
+                    }
+                }
+                if (ParentNodes.Count == 0)
+                    ParentNodes.Add(parentNode);
                 ParentNodes.Add(parentNode);
-            ParentNodes.Add(parentNode);
+            }
+            else
+            {
+                ;
+            }
+            
 
             Name = RepoConfig.name;
             Text = RepoConfig.name;
             Tag = this;
-            ToolTipText = RepoConfig.url;
+            ToolTipText = RepoConfig.fetchurl;
         }        
     }
     public class RepoManager : ComputeModule
@@ -137,11 +186,31 @@ namespace ccLib_netCore
         string ConfigReposDir;
         string ReposDir;
         string ReposDirUverseRoot;
+        string repoDirString;
+        public List<repoTreeNode> repoTreeNodesfromUverseGitStatua = null;
         List<List<repoTreeNode>> RepositoryTreeLevelLists = new List<List<repoTreeNode>>();
-        public RepoManager()
+        public RepoManager(string repoDirStringIn)
         {
             IMSConfiguration = new IMSConfigStruct();
-            IMSConfiguration.Path2RootRepository = Path.GetFullPath("C:\\IMS");
+            if (repoDirStringIn != null)
+            {
+                if (Directory.Exists(Path.GetFullPath(repoDirStringIn)))
+                {
+                    if(repoDirStringIn.EndsWith("\\"))
+                    {
+                        int rIndex = repoDirStringIn.LastIndexOf("\\");
+                        repoDirString = repoDirStringIn.Remove(rIndex);
+                    }
+                    else
+                        repoDirString = repoDirStringIn;
+                    
+                    IMSConfiguration.Path2RootRepository = Path.GetFullPath(repoDirString);
+                }
+                else
+                    IMSConfiguration.Path2RootRepository = "C:\\IMS";
+            }
+            else
+                IMSConfiguration.Path2RootRepository = "C:\\IMS";
             ConfigReposDir = tempDir + "\\ConfigurationRepos";
             ReposDir = tempDir + "\\UniverseRepos";
         }
@@ -150,8 +219,8 @@ namespace ccLib_netCore
             // if a new file has been loaded, parse and build nodes
             if(newConfigLoaded)
             {
-                BuildNodes();
                 newConfigLoaded = false;
+                BuildNodes();                
                 updateConfigflag = true;
             }
 
@@ -255,7 +324,7 @@ namespace ccLib_netCore
                         {
                             modText += $"[submodule \"{rNode.RepoConfig.name}\"]\r\n";
                             modText += $"\tpath = {rNode.RepoConfig.name}\r\n";
-                            modText += $"\turl = {rNode.RepoConfig.url}\r\n";
+                            modText += $"\turl = {rNode.RepoConfig.fetchurl}\r\n";
                         }
                         File.WriteAllText(moduleFname, modText);
                     }
@@ -306,7 +375,7 @@ namespace ccLib_netCore
                         // build commands to clone into config repos dir
                         thisCmd = new ExtProcCmdStruct();
                         thisCmd.cmdString = IMSConfiguration.Path2GitBin;
-                        thisCmd.cmdArguments = $"clone {((RepoNodeStruct)tNode.Tag).url} {Path.GetFullPath(ConfigReposDir + "\\" + ((RepoNodeStruct)tNode.Tag).name)}";
+                        thisCmd.cmdArguments = $"clone {((RepoNodeStruct)tNode.Tag).fetchurl} {Path.GetFullPath(ConfigReposDir + "\\" + ((RepoNodeStruct)tNode.Tag).name)}";
                         thisCmd.workingDirString = ConfigReposDir;
                         Cmds.Add(thisCmd);
                     }
@@ -370,7 +439,7 @@ namespace ccLib_netCore
                                 // build commands to submodule add 
                                 thisCmd = new ExtProcCmdStruct();
                                 thisCmd.cmdString = IMSConfiguration.Path2GitBin;
-                                thisCmd.cmdArguments = $"submodule add {thatRnode.url} {thatRnode.name}";
+                                thisCmd.cmdArguments = $"submodule add {thatRnode.fetchurl} {thatRnode.name}";
                                 thisCmd.workingDirString = ConfigReposDir + $"\\{thisRnode.name}";
                                 Cmds.Add(thisCmd);
 
@@ -600,29 +669,183 @@ namespace ccLib_netCore
             }
             return outstrig;
         }
+        private void ParseGitStringRemote(string remoteStringIn)
+        {
+            int parseIndex = remoteStringIn.IndexOf("out:");
+            string remoteSubString = remoteStringIn.Substring(parseIndex+ "out:".Length);
+            // out:
+            if (parseIndex==0)
+            { 
+                string[] tokens = remoteSubString.Split("Entering ");
+                
+                repoTreeNodesfromUverseGitStatua = new List<repoTreeNode>(tokens.Length);
+
+
+                foreach (string tok in tokens)
+                {
+                    string RepoDirNameString = null;
+                    string FecthURLString = null;
+                    string PushURLString = null;
+                    parseIndex = 0;
+
+                    if (tok != "\n")
+                    {
+                        //Regex rx = new Regex(@"^('(?<repoDirName>\S+)'origin (?<fetchURL>\S+) (fetch)origin (?<pushURL>\S+) (push))");
+                        //MatchCollection matches = rx.Matches(tok);
+                        RepoDirNameString = (tok.Remove(tok.LastIndexOf('\''))).Substring(1);
+                        parseIndex += (2 + RepoDirNameString.Length);
+                        remoteSubString = tok.Substring(parseIndex);
+                        FecthURLString = (remoteSubString.Substring(remoteSubString.IndexOf('\t') + 1)).Remove(remoteSubString.IndexOf(".git") - 3);
+                        parseIndex += (15 + FecthURLString.Length);
+                        remoteSubString = tok.Substring(parseIndex);
+                        PushURLString = (remoteSubString.Substring(remoteSubString.IndexOf('\t') + 1)).Remove(remoteSubString.IndexOf(".git") - 3);
+                        repoTreeNodesfromUverseGitStatua.Add(new repoTreeNode(null,new RepoNodeStruct()));
+                        repoTreeNodesfromUverseGitStatua[repoTreeNodesfromUverseGitStatua.Count - 1].RepoConfig.fetchurl = FecthURLString;
+                        repoTreeNodesfromUverseGitStatua[repoTreeNodesfromUverseGitStatua.Count - 1].RepoConfig.name = RepoDirNameString;
+                        repoTreeNodesfromUverseGitStatua[repoTreeNodesfromUverseGitStatua.Count - 1].Name = RepoDirNameString;
+                        repoTreeNodesfromUverseGitStatua[repoTreeNodesfromUverseGitStatua.Count - 1].Text = RepoDirNameString;
+                        repoTreeNodesfromUverseGitStatua[repoTreeNodesfromUverseGitStatua.Count - 1].RepoConfig.pushurl = PushURLString;
+                    }
+                    else
+                        ;
+
+                }
+                // Entering '<RepoDirName>'origin <fetchurl> (fetch)origin <pushurl> (push)
+
+                //Regex rx = new Regex(@"^(Entering '(?<repoDirName>[a-z1-9]+{1})'origin (?<fetchURL>*{1}) (fetch)origin (?<pushURL>*{1}) (push)){1}");
+                //MatchCollection matches = rx.Matches(remoteSubString);
+                //;
+            }            
+        }
+        private void ParseGitStringBranch(string branchStringIn)
+        {
+            int parseIndex = branchStringIn.IndexOf("out:");
+            string remoteSubString = branchStringIn.Substring(parseIndex + "out:".Length);
+            // out:
+            if (parseIndex == 0)
+            {
+                string[] tokens = remoteSubString.Split("Entering");
+
+                foreach (string tok in tokens)
+                {
+                    
+                    string RepoBranchesString = null;
+                    
+
+                    if (tok != "\n")
+                    {
+                        //Regex rx = new Regex(@"^('(?<repoDirName>\S+)'origin (?<fetchURL>\S+) (fetch)origin (?<pushURL>\S+) (push))");
+                        //MatchCollection matches = rx.Matches(tok);
+                        RepoBranchesString = tok.Substring(tok.IndexOf("* ")+2);
+                        repoTreeNodesfromUverseGitStatua[parseIndex++].RepoConfig.branchnames = RepoBranchesString.Split(' ', StringSplitOptions.RemoveEmptyEntries);                        
+                    }
+                }
+            }
+        }
+        private void ParseGitStringStatus(string statusStringIn)
+        {
+            int parseIndex = statusStringIn.IndexOf("out:");
+            string remoteSubString = statusStringIn.Substring(parseIndex + "out:".Length);
+            // out:
+            if (parseIndex == 0)
+            {
+                string[] tokens = remoteSubString.Split("Entering");
+
+                foreach (string tok in tokens)
+                {
+                    string ActiveBranchString = null;
+                    string ChangesString = null;
+
+                    if (tok != "\n")
+                    {
+                        ActiveBranchString = (tok.Substring(tok.IndexOf("## ") + 3));
+                        ActiveBranchString = ActiveBranchString.Remove(ActiveBranchString.IndexOf("..."));
+                        repoTreeNodesfromUverseGitStatua[parseIndex].RepoConfig.activebranch = ActiveBranchString;
+                        repoTreeNodesfromUverseGitStatua[parseIndex].ActiveBranch = repoTreeNodesfromUverseGitStatua[parseIndex].RepoConfig.activebranch;
+                        ChangesString = (tok.Substring(tok.LastIndexOf(ActiveBranchString) + ActiveBranchString.Length));
+                        repoTreeNodesfromUverseGitStatua[parseIndex].changesString = ChangesString;
+                        parseIndex++;
+                    }
+                    
+                }
+            }
+        }
+        private void ParseUniverseGitStrings(string remoteStringIn, string branchStringIn, string statusStringIn)
+        {
+            // parse the remote string
+            ParseGitStringRemote(remoteStringIn);
+
+            // parse the branch string
+            ParseGitStringBranch(branchStringIn);
+
+            // parse the status string
+            ParseGitStringStatus(statusStringIn);
+        }
         private void BuildNodes()
         {            
+            // Create a Config Node from the configuration settings
             IMSConfigNode = createGUItreeNodefromConfig(IMSConfiguration);
+            // Create a Repo Node from the working directory of the root node
             RepositoryTreeRootNode = createREPOtreeNodefromRepoList(IMSConfiguration.Repositories);
             ((repoTreeNode)RepositoryTreeRootNode.Nodes[0]).Depth = 0;
+
+            // What does git think about it?
+            ExtProcCmdStruct thisCmd = new ExtProcCmdStruct();
+            thisCmd.cmdArguments = "submodule foreach --recursive git remote -v";
+            thisCmd.timeOutms = 5000;
+            thisCmd.cmdString = IMSConfiguration.Path2GitBin;
+            thisCmd.workingDirString = IMSConfiguration.Path2RootRepository;
+
+            List<ExtProcCmdStruct> cmdsIn = new List<ExtProcCmdStruct>();
+            cmdsIn.Add(thisCmd);
+            exeSysLink.ThirdPartyTools.executeCMDS(cmdsIn);
+
+            string remoteString = thisCmd.outANDerrorResults;
+
+            thisCmd.cmdArguments = "submodule foreach --recursive git branch";
+            exeSysLink.ThirdPartyTools.executeCMDS(cmdsIn);
+
+            string branchString = thisCmd.outANDerrorResults;
+
+            thisCmd.cmdArguments = "submodule foreach --recursive git status -b --porcelain";
+            exeSysLink.ThirdPartyTools.executeCMDS(cmdsIn);
+
+            string statusString = thisCmd.outANDerrorResults;
+
+
+            ParseUniverseGitStrings(remoteString, branchString, statusString);
+   
             RecursiveDetectWorkingDirectoryStatus((repoTreeNode)RepositoryTreeRootNode.Nodes[0]);            
         }
-
+        /// <summary>
+        /// Detect Status of Working Directory
+        /// - called recursively
+        /// </summary>
+        /// <param name="rootRepoNode"></param>
         public void DetectWorkingDirectoryStatus(repoTreeNode rootRepoNode)
         {
-            rootRepoNode.isReachable = true;
-            rootRepoNode.hasChanges = true;
+            rootRepoNode.isReachable = false;
 
             string sName = expectedWorkingDirectoryPath(rootRepoNode);
 
+            // First things first, does this directory exist in the file system?
             if (Directory.Exists(sName))
             {
                 rootRepoNode.workingDir = sName;
-            }            
+
+                          
+
+            }
             else
                 rootRepoNode.workingDir = "Not Detected";
 
 
+            
+
+
+
+
+            // Categorize Repository Tree Node by level/depth
             if (RepositoryTreeLevelLists.Count <= rootRepoNode.Depth)
             {
                 RepositoryTreeLevelLists.Add(new List<repoTreeNode>());
@@ -632,6 +855,10 @@ namespace ccLib_netCore
 
 
         }
+        /// <summary>
+        /// The Recursive Detection Working Directory Status Function
+        /// </summary>
+        /// <param name="rootRepoNode"></param>
         public void RecursiveDetectWorkingDirectoryStatus(repoTreeNode rootRepoNode)
         {
             // detect status for self
@@ -812,10 +1039,14 @@ namespace ccLib_netCore
                 }
             }
         }
-        public static IMSConfigStruct CreateDefaultIMSConfigStruct()
+        public static IMSConfigStruct CreateDefaultIMSConfigStruct(string inputString)
         {
             IMSConfigStruct outStruct = new IMSConfigStruct();
-            outStruct.Path2RootRepository = "C:\\IMS";
+            if(Directory.Exists(Path.GetFullPath(inputString)))
+                outStruct.Path2RootRepository = Path.GetFullPath(inputString);
+            else
+                outStruct.Path2RootRepository = "C:\\IMS";
+
             outStruct.Path2DoxygenBin = "C:\\Program Files\\doxygen\\bin\\doxygen.exe";
             outStruct.Path2GitBin = "C:\\Program Files\\Git\\bin\\git.exe";
             outStruct.Path2GraphVizDotBin = "C:\\Program Files\\Graphviz\\bin\\dot.exe";
@@ -823,65 +1054,65 @@ namespace ccLib_netCore
 
             RepoNodeStruct tempNode = new RepoNodeStruct();
             tempNode.name = "IMS";
-            tempNode.url = "https://github.com/InMechaSol/IMS.git";
+            tempNode.fetchurl = "https://github.com/InMechaSol/IMS.git";
             tempNode.submodnames = new string[] { "CR", "CS", "P" };
             outStruct.Repositories.Add(tempNode);
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "CR";
-            tempNode.url = "https://github.com/InMechaSol/CR.git";
+            tempNode.fetchurl = "https://github.com/InMechaSol/CR.git";
             tempNode.submodnames = new string[] { "ccACU", "ccACU_Tests", "ccOS", "ccOS_Tests", "ccNOos", "ccNOos_Tests" };
             outStruct.Repositories.Add(tempNode);
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "CS";
-            tempNode.url = "https://github.com/InMechaSol/CS.git";
+            tempNode.fetchurl = "https://github.com/InMechaSol/CS.git";
             tempNode.submodnames = new string[] { "TS4900ACU" };
             outStruct.Repositories.Add(tempNode);
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "P";
-            tempNode.url = "https://github.com/InMechaSol/P.git";
+            tempNode.fetchurl = "https://github.com/InMechaSol/P.git";
             outStruct.Repositories.Add(tempNode);
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "ccACU";
-            tempNode.url = "https://github.com/InMechaSol/ccACU.git";
+            tempNode.fetchurl = "https://github.com/InMechaSol/ccACU.git";
             tempNode.submodnames = new string[] { "ccOS" };
             outStruct.Repositories.Add(tempNode);
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "ccACU_Tests";
-            tempNode.url = "https://github.com/InMechaSol/ccACU_Tests.git";
+            tempNode.fetchurl = "https://github.com/InMechaSol/ccACU_Tests.git";
             tempNode.submodnames = new string[] { "ccACU" };
             outStruct.Repositories.Add(tempNode);
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "ccNOos";
-            tempNode.url = "https://github.com/InMechaSol/ccNOos.git";
+            tempNode.fetchurl = "https://github.com/InMechaSol/ccNOos.git";
             outStruct.Repositories.Add(tempNode);
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "ccNOos_Tests";
-            tempNode.url = "https://github.com/InMechaSol/ccNOos_Tests.git";
+            tempNode.fetchurl = "https://github.com/InMechaSol/ccNOos_Tests.git";
             tempNode.submodnames = new string[] { "ccNOos" };
             outStruct.Repositories.Add(tempNode);
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "ccOS";
-            tempNode.url = "https://github.com/InMechaSol/ccOS.git";
+            tempNode.fetchurl = "https://github.com/InMechaSol/ccOS.git";
             tempNode.submodnames = new string[] { "ccNOos" };
             outStruct.Repositories.Add(tempNode);
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "ccOS_Tests";
-            tempNode.url = "https://github.com/InMechaSol/ccOS_Tests.git";
+            tempNode.fetchurl = "https://github.com/InMechaSol/ccOS_Tests.git";
             tempNode.submodnames = new string[] { "ccOS" };
             outStruct.Repositories.Add(tempNode);
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "TS4900ACU";
-            tempNode.url = "https://github.com/InMechaSol/TS4900ACU.git";
+            tempNode.fetchurl = "https://github.com/InMechaSol/TS4900ACU.git";
             tempNode.submodnames = new string[] { "ccACU" };
             outStruct.Repositories.Add(tempNode);
 
