@@ -6,9 +6,83 @@ using System.Threading.Tasks;
 using System.IO;
 using System.ComponentModel;
 using System.Text.RegularExpressions;
+using System.Security.Cryptography.X509Certificates;
 
 namespace ccLib_netCore
 {
+    
+    public class PlatformNodeStruct
+    {
+        [Category("Platform Configuration")]
+        [Description("A name for the platform")]
+        [DisplayName("platformName")]
+        public string platformName { get; set; }
+        [Category("Platform Configuration")]
+        [Description("Indication that this platform compiles the pure C execution system and application")]
+        [DisplayName("isStraightC")]
+        public bool isStraightC { get; set; }
+        [Category("Platform Configuration")]
+        [Description("Indication that this platform compiles the ccNOos only CPP execution system and application")]
+        [DisplayName("isNOosCPP")]
+        public bool isNOosCPP { get; set; }
+        [Category("Platform Configuration")]
+        [Description("Platform API Functions use size+1 vs only size in print/parse functions")]
+        [DisplayName("platformAPIfuncPlusOne")]
+        public bool platformAPIfuncPlusOne { get; set; }
+        [Category("Platform Configuration")]
+        [Description("Console Menu and Strings have support on this platform")]
+        [DisplayName("usingConsoleMenu")]
+        public bool usingConsoleMenu { get; set; }
+    }
+    public class ModuleNodeStruct
+    {
+        [Category("Module Configuration")]
+        [Description("Name of the module")]
+        [DisplayName("modname")]
+        public string modname { get; set; }
+        [Category("Module Configuration")]
+        [Description("Indication that this module is an API module")]
+        [DisplayName("isAPImod")]
+        public bool isAPImod { get; set; }
+        [Category("Module Configuration")]
+        [Description("Indication that this module is a Device Module")]
+        [DisplayName("isDEVmod")]
+        public bool isDEVmod { get; set; }
+        [Category("Module Configuration")]
+        [Description("Indication that this module is ccNOos c/c++ compliant")]
+        [DisplayName("isNOosMod")]
+        public bool isNOosMod { get; set; }
+    }
+    public class LibsNodeStruct
+    {
+        [Category("ccLibs Configuration")]
+        [Description("Indication to use/not use ccOS layer")]
+        [DisplayName("ccOSusing")]
+        public bool ccOSusing { get; set; }
+    }
+    public class ApplicationNodeStruct
+    {
+        [Category("Application Configuration")]
+        [Description("List of Compute Module Configuration Structures")]
+        [DisplayName("moduleNodeStructs")]
+        public List<ModuleNodeStruct> moduleNodeStructs { get; set; }
+        [Category("Application Configuration")]
+        [Description("List of Library Configuration Structures")]
+        [DisplayName("ccLibsNodeStructs")]
+        public List<LibsNodeStruct> ccLibsNodeStructs { get; set; }
+    }    
+    public class SolutionNodeStruct
+    {
+        [Category("Compute Solution Configuration")]
+        [Description("List of Application Configuration Structures")]
+        [DisplayName("applicationNodeStructs")]
+        public List<ApplicationNodeStruct> applicationNodeStructs { get; set; }
+        [Category("Compute Solution Configuration")]
+        [Description("List of Platform Configuration Structures")]
+        [DisplayName("platformNodeStructs")]
+        public List<PlatformNodeStruct> platformNodeStructs { get; set; }
+    }
+
     /// <summary>
     /// Repository Node Structure
     /// the Data Structure for repository nodes
@@ -168,30 +242,68 @@ namespace ccLib_netCore
 
             Name = RepoConfig.name;
             Text = RepoConfig.name;
+            ActiveBranch = RepoConfig.activebranch;
             Tag = this;
             ToolTipText = RepoConfig.fetchurl;
         }        
     }
     public class RepoManager : ComputeModule
     {
-
+        /// <summary>
+        ///  The Active Configuration structure, from file
+        /// </summary>
         public IMSConfigStruct IMSConfiguration { set; get; }
+        /// <summary>
+        /// The guiTreeNode for Configuration
+        /// </summary>
         public guiTreeNode IMSConfigNode { set; get; }
+        /// <summary>
+        /// The guiTreeNode for Reopsitory Nodes
+        /// </summary>
         public repoTreeNode RepositoryTreeRootNode { set; get; }
+        /// <summary>
+        /// Inidication of new config loaded
+        /// </summary>
         public bool newConfigLoaded { get; set; } = false;
+        /// <summary>
+        /// Indication that active configuration should be updated
+        /// </summary>
         public bool updateConfigflag = true;
+        /// <summary>
+        /// Trigger for the loop function to run "BuildRepos"
+        /// </summary>
         public bool buildReposFromRemotes { get; set; } = false;
+        /// <summary>
+        /// Trigger for the loop function to run "CreateNewSolution"
+        /// </summary>
+        public bool createNewSolutionfromConfig { get; set; } = false;
+        /// <summary>
+        /// Trigger for the loop function to run "pushTemp2Remotes)
+        /// </summary>
         public bool pushTempRepos2Remotes { get; set; } = false;
+        /// <summary>
+        /// Trigger for the git universe status function to run in loop()
+        /// </summary>
+        public bool UniverseGitStatusTrigger { get; set; } = false; 
+        /// <summary>
+        /// Temporary Directory Root for the repomanager
+        /// </summary>
         string tempDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\RepoManager";
         string ConfigReposDir;
         string ReposDir;
         string ReposDirUverseRoot;
         string repoDirString;
-        public List<repoTreeNode> repoTreeNodesfromUverseGitStatua = null;
+        public List<repoTreeNode> repoTreeNodesfromUverseGitStatua = new List<repoTreeNode>();
         List<List<repoTreeNode>> RepositoryTreeLevelLists = new List<List<repoTreeNode>>();
+        /// <summary>
+        /// Constructor from Universe Repository Root Directory
+        /// </summary>
+        /// <param name="repoDirStringIn"></param>
         public RepoManager(string repoDirStringIn)
         {
+            // create a new config struct
             IMSConfiguration = new IMSConfigStruct();
+            // if the input path is not null
             if (repoDirStringIn != null)
             {
                 if (Directory.Exists(Path.GetFullPath(repoDirStringIn)))
@@ -209,14 +321,19 @@ namespace ccLib_netCore
                 else
                     IMSConfiguration.Path2RootRepository = "C:\\IMS";
             }
-            else
+            else// if the input path was null, default to C:\\IMS
                 IMSConfiguration.Path2RootRepository = "C:\\IMS";
+
+            // set temp directory paths on the repo manager
             ConfigReposDir = tempDir + "\\ConfigurationRepos";
             ReposDir = tempDir + "\\UniverseRepos";
         }
+        /// <summary>
+        /// The Loop function of the Repository Manager Module
+        /// </summary>
         protected override void Loop()
         {
-            // if a new file has been loaded, parse and build nodes
+            // if a new config has been loaded, parse and build nodes
             if(newConfigLoaded)
             {
                 newConfigLoaded = false;
@@ -224,13 +341,28 @@ namespace ccLib_netCore
                 updateConfigflag = true;
             }
 
+            // if triggered, build repositories in temp directory using git and
             if(buildReposFromRemotes)
             {
                 buildReposFromRemotes = false;
                 BuildRepos();
             }
 
-            if(pushTempRepos2Remotes)
+            // if triggered, create new solution from configuration file using git and code generator
+            if(createNewSolutionfromConfig)
+            {
+                createNewSolutionfromConfig = false;
+                CreateSolutionfromConfig();
+            }
+            
+            // if triggered, check git status for universe submodules
+            if (UniverseGitStatusTrigger)
+            {
+                UniverseGitStatusTrigger = false;
+                CheckGitStatus(IMSConfiguration.Path2GitBin, IMSConfiguration.Path2RootRepository);
+                updateConfigflag = true;
+            }
+            if (pushTempRepos2Remotes)
             {
                 pushTempRepos2Remotes = false;
                 PushTemp2Remotes();
@@ -279,6 +411,11 @@ namespace ccLib_netCore
             foreach (string dstring in Directory.GetDirectories(sourceDir))
                 copyFilesNFoldersRecurrsive(dstring, targetDir+$"\\{dstring.Replace(sourceDir,"")}");
         }
+        /// <summary>
+        /// UniversefromConfig creates ??
+        /// </summary>
+        /// <param name="ParentDirPath"></param>
+        /// <param name="Node2Transfer"></param>
         void UniversefromConfig(string ParentDirPath, repoTreeNode Node2Transfer)
         {
             string configDirPath = ConfigReposDir+$"\\{Node2Transfer.Name}";
@@ -351,6 +488,9 @@ namespace ccLib_netCore
             }
 
         }
+        /// <summary>
+        /// Build Repository Tree nodes from Universe Configuration
+        /// </summary>
         public void BuildRepos()
         {
             List<ExtProcCmdStruct> Cmds = new List<ExtProcCmdStruct>();
@@ -566,6 +706,104 @@ namespace ccLib_netCore
                 }
             }
         }
+        /// <summary>
+        /// Create a new compute solution from config
+        /// - Using ccOS / ccNOos
+        /// - create solution directory for
+        ///  - desired platform(s)
+        ///  - desired application
+        /// </summary>
+        public void CreateSolutionfromConfig()
+        {
+            // create the default solution config structure for testing
+            SolutionNodeStruct confSol = new SolutionNodeStruct();
+            confSol.applicationNodeStructs = new List<ApplicationNodeStruct>();
+            confSol.platformNodeStructs = new List<PlatformNodeStruct>();
+
+            // the platform specification
+            confSol.platformNodeStructs.Add(new PlatformNodeStruct());
+            confSol.platformNodeStructs[0].platformName = "Teensy";
+            confSol.platformNodeStructs[0].isStraightC = false;
+            confSol.platformNodeStructs[0].platformAPIfuncPlusOne = true;
+            confSol.platformNodeStructs[0].usingConsoleMenu = true;
+            confSol.platformNodeStructs[0].isNOosCPP = true;
+
+            // the application definition
+            confSol.applicationNodeStructs.Add(new ApplicationNodeStruct());
+            // the application compute module
+            confSol.applicationNodeStructs[0].moduleNodeStructs = new List<ModuleNodeStruct>();
+            confSol.applicationNodeStructs[0].moduleNodeStructs[0].modname = "iGripperFW";
+            confSol.applicationNodeStructs[0].moduleNodeStructs[0].isAPImod = false;
+            confSol.applicationNodeStructs[0].moduleNodeStructs[0].isDEVmod = false;
+            confSol.applicationNodeStructs[0].moduleNodeStructs[0].isNOosMod = true;
+            // the console menu api module
+            confSol.applicationNodeStructs[0].moduleNodeStructs = new List<ModuleNodeStruct>();
+            confSol.applicationNodeStructs[0].moduleNodeStructs[1].modname = "MenuAPI_iGripperFW";
+            confSol.applicationNodeStructs[0].moduleNodeStructs[1].isAPImod = true;
+            confSol.applicationNodeStructs[0].moduleNodeStructs[1].isDEVmod = false;
+            confSol.applicationNodeStructs[0].moduleNodeStructs[1].isNOosMod = true;
+            // the packets interface api module
+            confSol.applicationNodeStructs[0].moduleNodeStructs = new List<ModuleNodeStruct>();
+            confSol.applicationNodeStructs[0].moduleNodeStructs[2].modname = "PacksAPI_iGripperFW";
+            confSol.applicationNodeStructs[0].moduleNodeStructs[2].isAPImod = true;
+            confSol.applicationNodeStructs[0].moduleNodeStructs[2].isDEVmod = false;
+            confSol.applicationNodeStructs[0].moduleNodeStructs[2].isNOosMod = true;
+            // the suction device module
+            confSol.applicationNodeStructs[0].moduleNodeStructs = new List<ModuleNodeStruct>();
+            confSol.applicationNodeStructs[0].moduleNodeStructs[3].modname = "SuctionDEV_iGripperFW";
+            confSol.applicationNodeStructs[0].moduleNodeStructs[3].isAPImod = false;
+            confSol.applicationNodeStructs[0].moduleNodeStructs[3].isDEVmod = true;
+            confSol.applicationNodeStructs[0].moduleNodeStructs[3].isNOosMod = true;
+            // the smart motors device module
+            confSol.applicationNodeStructs[0].moduleNodeStructs = new List<ModuleNodeStruct>();
+            confSol.applicationNodeStructs[0].moduleNodeStructs[4].modname = "SmartMotorsDEV_iGripperFW";
+            confSol.applicationNodeStructs[0].moduleNodeStructs[4].isAPImod = false;
+            confSol.applicationNodeStructs[0].moduleNodeStructs[4].isDEVmod = true;
+            confSol.applicationNodeStructs[0].moduleNodeStructs[4].isNOosMod = true;
+            // the libraries configuration for the application
+            confSol.applicationNodeStructs[0].ccLibsNodeStructs = new List<LibsNodeStruct>();
+            confSol.applicationNodeStructs[0].ccLibsNodeStructs[0].ccOSusing = false;
+
+
+
+
+
+
+
+
+            // Create Temp Directory for New Solution if it does'nt exist
+            if(!Directory.Exists(Path.Combine(tempDir,"\\newSolution")))
+            {
+                Directory.CreateDirectory(Path.Combine(tempDir, "\\newSolution"));
+            }
+            else // Delete the contents of the directory otherwise
+            {
+                DeleteFilesAndFoldersRecursively(Path.Combine(tempDir, "\\newSolution"));
+            }
+
+            // Populate Temp Directory with Libs
+
+            // libs - pull / clone ??
+
+            // Create Sub Directory(ies) for Application(s)
+
+            // Populate Application Directoies
+
+            // application
+            // app - api modules             
+            // app - device modules
+
+            // Create Sub Directory(ies) for Platform(s)
+
+            // Populate Platform Directories
+
+            // main files            
+            // platform(s)
+
+
+
+
+        }
         public void PushTemp2Remotes()
         {
             for(int i = RepositoryTreeLevelLists.Count - 1; i>=0; i--)
@@ -668,6 +906,36 @@ namespace ccLib_netCore
                 outstrig += "\\" + parentNames[i];
             }
             return outstrig;
+        }
+        /// <summary>
+        /// Univers git Status
+        /// - call from universe repo to determine status of all submodules
+        /// </summary>
+        /// <param name="cmdStringIn">the path to the git.exe application</param>
+        /// <param name="wrkNDir"> the working directory of the "IMS" folder</param>
+        private void CheckGitStatus(string cmdStringIn, string wrkNDir)
+        {
+            // What does git think about it?
+            ExtProcCmdStruct thisCmd = new ExtProcCmdStruct();
+            thisCmd.cmdArguments = "submodule foreach --recursive git remote -v";
+            thisCmd.timeOutms = 5000;
+            thisCmd.cmdString = cmdStringIn;
+            thisCmd.workingDirString = wrkNDir;
+
+            List<ExtProcCmdStruct> cmdsIn = new List<ExtProcCmdStruct>();
+            cmdsIn.Add(thisCmd);
+            exeSysLink.ThirdPartyTools.executeCMDS(cmdsIn);
+            string remoteString = thisCmd.outANDerrorResults;
+
+            thisCmd.cmdArguments = "submodule foreach --recursive git branch";
+            exeSysLink.ThirdPartyTools.executeCMDS(cmdsIn);
+            string branchString = thisCmd.outANDerrorResults;
+
+            thisCmd.cmdArguments = "submodule foreach --recursive git status -b --porcelain";
+            exeSysLink.ThirdPartyTools.executeCMDS(cmdsIn);
+            string statusString = thisCmd.outANDerrorResults;
+
+            ParseUniverseGitStrings(remoteString, branchString, statusString);
         }
         private void ParseGitStringRemote(string remoteStringIn)
         {
@@ -781,40 +1049,124 @@ namespace ccLib_netCore
             // parse the status string
             ParseGitStringStatus(statusStringIn);
         }
+        public IMSConfigStruct CreateIMSConfigStructfromUverseStatus(string inputString)
+        {
+            if (!Directory.Exists(Path.GetFullPath(inputString)))
+            {
+                Directory.CreateDirectory(Path.GetFullPath(inputString));
+                return CreateDefaultIMSConfigStruct(inputString);
+            }
+            IMSConfigStruct outStruct =     new IMSConfigStruct();
+            outStruct.Path2RootRepository = Path.GetFullPath(inputString);
+            outStruct.Path2DoxygenBin =     "C:\\Program Files\\doxygen\\bin\\doxygen.exe";
+            outStruct.Path2GitBin =         "C:\\Program Files\\Git\\bin\\git.exe";
+            outStruct.Path2GraphVizDotBin = "C:\\Program Files\\Graphviz\\bin\\dot.exe";
+
+            CheckGitStatus(outStruct.Path2GitBin, outStruct.Path2RootRepository);
+
+            outStruct.Repositories = new List<RepoNodeStruct>();
+
+            RepoNodeStruct tempNode = new RepoNodeStruct();
+            tempNode.name = "IMI";
+            tempNode.fetchurl = "https://github.com/NORGREN-AUTOMATION/IMS.git";
+            tempNode.pushurl = "https://github.com/NORGREN-AUTOMATION/IMS.git";
+            tempNode.submodnames = new string[] { "CR", "CS", "P" };
+            outStruct.Repositories.Add(tempNode);
+
+            string tempString = "";
+            // loop through the list of nodes generated by git status checks
+            foreach(repoTreeNode rTN in repoTreeNodesfromUverseGitStatua)
+            {
+                // if an entry with mathcing fetch url does not already exists in the lists
+                if(!outStruct.Repositories.Exists(x=>x.fetchurl==rTN.RepoConfig.fetchurl))
+                {
+                    // Create and add the configuration repository
+                    tempNode = new RepoNodeStruct();
+
+                    // if this is a sub repo
+                    if (rTN.RepoConfig.name.Contains('/'))
+                    {
+                        // capture name of repo
+                        tempNode.name = rTN.RepoConfig.name.Substring(rTN.RepoConfig.name.LastIndexOf('/') + 1);
+                    }
+                    else
+                        tempNode.name = rTN.RepoConfig.name;
+                    tempNode.fetchurl = rTN.RepoConfig.fetchurl;
+                    tempNode.pushurl = rTN.RepoConfig.pushurl;
+                    tempNode.branchnames = rTN.RepoConfig.branchnames;
+                    //tempNode.activebranch = rTN.RepoConfig.activebranch;
+                    outStruct.Repositories.Add(tempNode);
+                }
+            }
+
+            // loop through the list of nodes generated by git status checks
+            foreach (repoTreeNode rTN in repoTreeNodesfromUverseGitStatua)
+            {
+                // Create and add the configuration repository
+                tempNode = new RepoNodeStruct();
+
+                // if this is a sub repo
+                if (rTN.RepoConfig.name.Contains('/'))
+                {
+                    // capture name of repo
+                    tempNode.name = rTN.RepoConfig.name.Substring(rTN.RepoConfig.name.LastIndexOf('/') + 1);
+                    tempString = rTN.RepoConfig.name.Remove(rTN.RepoConfig.name.LastIndexOf('/'));//.Substring(rTN.RepoConfig.name.LastIndexOf('/') + 1);
+                                                                                                  // capture name of parent repo
+                    tempString = tempString.Substring(tempString.LastIndexOf('/') + 1);
+                    // check if parent repo is already in config repos (it should be)
+                    if (outStruct.Repositories.Find(x => x.name == tempString) != null)
+                    {
+                        if (outStruct.Repositories.Find(x => x.name == tempString).submodnames != null)
+                        {
+                            if (!outStruct.Repositories.Find(x => x.name == tempString).submodnames.Contains(tempNode.name))
+                            {
+                                List<string> stletp = new List<string>(outStruct.Repositories.Find(x => x.name == tempString).submodnames);
+                                stletp.Add(tempNode.name);
+                                outStruct.Repositories.Find(x => x.name == tempString).submodnames = stletp.ToArray();
+                            }
+                        }
+                        else
+                        {
+                            outStruct.Repositories.Find(x => x.name == tempString).submodnames = new string[] { tempNode.name };
+                        }
+
+                    }
+
+                }
+
+            }
+
+            return outStruct;
+        }
+        /// <summary>
+        /// Build TreeNodes when configuration is loaded/changed
+        /// </summary>
         private void BuildNodes()
-        {            
+        {
+            // Determine if default config
+            if (IMSConfiguration.Repositories.Count == 8 &&
+                IMSConfiguration.Repositories[1].fetchurl == "https://github.com/InMechaSol/CR.git" &&
+                IMSConfiguration.Repositories[2].fetchurl == "https://github.com/InMechaSol/CS.git" &&
+                IMSConfiguration.Repositories[3].fetchurl == "https://github.com/InMechaSol/P.git" &&
+                IMSConfiguration.Repositories[4].fetchurl == "https://github.com/InMechaSol/ccNOos.git" &&
+                IMSConfiguration.Repositories[5].fetchurl == "https://github.com/InMechaSol/ccNOos_Tests.git" &&
+                IMSConfiguration.Repositories[6].fetchurl == "https://github.com/InMechaSol/ccOS.git" &&
+                IMSConfiguration.Repositories[7].fetchurl == "https://github.com/InMechaSol/ccOS_Tests.git"
+                )
+            {
+                // Run git status if so
+                IMSConfiguration = CreateIMSConfigStructfromUverseStatus(IMSConfiguration.Path2RootRepository);
+            }
+                
+
             // Create a Config Node from the configuration settings
             IMSConfigNode = createGUItreeNodefromConfig(IMSConfiguration);
-            // Create a Repo Node from the working directory of the root node
+            // Create a Repo Node from 
             RepositoryTreeRootNode = createREPOtreeNodefromRepoList(IMSConfiguration.Repositories);
-            ((repoTreeNode)RepositoryTreeRootNode.Nodes[0]).Depth = 0;
-
-            // What does git think about it?
-            ExtProcCmdStruct thisCmd = new ExtProcCmdStruct();
-            thisCmd.cmdArguments = "submodule foreach --recursive git remote -v";
-            thisCmd.timeOutms = 5000;
-            thisCmd.cmdString = IMSConfiguration.Path2GitBin;
-            thisCmd.workingDirString = IMSConfiguration.Path2RootRepository;
-
-            List<ExtProcCmdStruct> cmdsIn = new List<ExtProcCmdStruct>();
-            cmdsIn.Add(thisCmd);
-            exeSysLink.ThirdPartyTools.executeCMDS(cmdsIn);
-
-            string remoteString = thisCmd.outANDerrorResults;
-
-            thisCmd.cmdArguments = "submodule foreach --recursive git branch";
-            exeSysLink.ThirdPartyTools.executeCMDS(cmdsIn);
-
-            string branchString = thisCmd.outANDerrorResults;
-
-            thisCmd.cmdArguments = "submodule foreach --recursive git status -b --porcelain";
-            exeSysLink.ThirdPartyTools.executeCMDS(cmdsIn);
-
-            string statusString = thisCmd.outANDerrorResults;
 
 
-            ParseUniverseGitStrings(remoteString, branchString, statusString);
-   
+
+            ((repoTreeNode)RepositoryTreeRootNode.Nodes[0]).Depth = 0;  
             RecursiveDetectWorkingDirectoryStatus((repoTreeNode)RepositoryTreeRootNode.Nodes[0]);            
         }
         /// <summary>
@@ -967,7 +1319,7 @@ namespace ccLib_netCore
         public repoTreeNode createREPOtreeNodefromRepoList(List<RepoNodeStruct> refList)
         {
             
-            repoTreeNode tempNode = new repoTreeNode();
+            repoTreeNode tempNode = new repoTreeNode(); 
             tempNode.Nodes = new List<guiTreeNode>();
             tempNode.Name = "RepoDirectoryTree";
             tempNode.Text = "Repository Directories";
@@ -1061,31 +1413,18 @@ namespace ccLib_netCore
             tempNode = new RepoNodeStruct();
             tempNode.name = "CR";
             tempNode.fetchurl = "https://github.com/InMechaSol/CR.git";
-            tempNode.submodnames = new string[] { "ccACU", "ccACU_Tests", "ccOS", "ccOS_Tests", "ccNOos", "ccNOos_Tests" };
+            tempNode.submodnames = new string[] { "ccOS", "ccOS_Tests", "ccNOos", "ccNOos_Tests" };
             outStruct.Repositories.Add(tempNode);
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "CS";
             tempNode.fetchurl = "https://github.com/InMechaSol/CS.git";
-            tempNode.submodnames = new string[] { "TS4900ACU" };
             outStruct.Repositories.Add(tempNode);
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "P";
             tempNode.fetchurl = "https://github.com/InMechaSol/P.git";
-            outStruct.Repositories.Add(tempNode);
-
-            tempNode = new RepoNodeStruct();
-            tempNode.name = "ccACU";
-            tempNode.fetchurl = "https://github.com/InMechaSol/ccACU.git";
-            tempNode.submodnames = new string[] { "ccOS" };
-            outStruct.Repositories.Add(tempNode);
-
-            tempNode = new RepoNodeStruct();
-            tempNode.name = "ccACU_Tests";
-            tempNode.fetchurl = "https://github.com/InMechaSol/ccACU_Tests.git";
-            tempNode.submodnames = new string[] { "ccACU" };
-            outStruct.Repositories.Add(tempNode);
+            outStruct.Repositories.Add(tempNode);            
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "ccNOos";
@@ -1101,19 +1440,12 @@ namespace ccLib_netCore
             tempNode = new RepoNodeStruct();
             tempNode.name = "ccOS";
             tempNode.fetchurl = "https://github.com/InMechaSol/ccOS.git";
-            tempNode.submodnames = new string[] { "ccNOos" };
             outStruct.Repositories.Add(tempNode);
 
             tempNode = new RepoNodeStruct();
             tempNode.name = "ccOS_Tests";
             tempNode.fetchurl = "https://github.com/InMechaSol/ccOS_Tests.git";
             tempNode.submodnames = new string[] { "ccOS" };
-            outStruct.Repositories.Add(tempNode);
-
-            tempNode = new RepoNodeStruct();
-            tempNode.name = "TS4900ACU";
-            tempNode.fetchurl = "https://github.com/InMechaSol/TS4900ACU.git";
-            tempNode.submodnames = new string[] { "ccACU" };
             outStruct.Repositories.Add(tempNode);
 
             return outStruct;
