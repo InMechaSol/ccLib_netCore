@@ -10,79 +10,6 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace ccLib_netCore
 {
-    
-    public class PlatformNodeStruct
-    {
-        [Category("Platform Configuration")]
-        [Description("A name for the platform")]
-        [DisplayName("platformName")]
-        public string platformName { get; set; }
-        [Category("Platform Configuration")]
-        [Description("Indication that this platform compiles the pure C execution system and application")]
-        [DisplayName("isStraightC")]
-        public bool isStraightC { get; set; }
-        [Category("Platform Configuration")]
-        [Description("Indication that this platform compiles the ccNOos only CPP execution system and application")]
-        [DisplayName("isNOosCPP")]
-        public bool isNOosCPP { get; set; }
-        [Category("Platform Configuration")]
-        [Description("Platform API Functions use size+1 vs only size in print/parse functions")]
-        [DisplayName("platformAPIfuncPlusOne")]
-        public bool platformAPIfuncPlusOne { get; set; }
-        [Category("Platform Configuration")]
-        [Description("Console Menu and Strings have support on this platform")]
-        [DisplayName("usingConsoleMenu")]
-        public bool usingConsoleMenu { get; set; }
-    }
-    public class ModuleNodeStruct
-    {
-        [Category("Module Configuration")]
-        [Description("Name of the module")]
-        [DisplayName("modname")]
-        public string modname { get; set; }
-        [Category("Module Configuration")]
-        [Description("Indication that this module is an API module")]
-        [DisplayName("isAPImod")]
-        public bool isAPImod { get; set; }
-        [Category("Module Configuration")]
-        [Description("Indication that this module is a Device Module")]
-        [DisplayName("isDEVmod")]
-        public bool isDEVmod { get; set; }
-        [Category("Module Configuration")]
-        [Description("Indication that this module is ccNOos c/c++ compliant")]
-        [DisplayName("isNOosMod")]
-        public bool isNOosMod { get; set; }
-    }
-    public class LibsNodeStruct
-    {
-        [Category("ccLibs Configuration")]
-        [Description("Indication to use/not use ccOS layer")]
-        [DisplayName("ccOSusing")]
-        public bool ccOSusing { get; set; }
-    }
-    public class ApplicationNodeStruct
-    {
-        [Category("Application Configuration")]
-        [Description("List of Compute Module Configuration Structures")]
-        [DisplayName("moduleNodeStructs")]
-        public List<ModuleNodeStruct> moduleNodeStructs { get; set; }
-        [Category("Application Configuration")]
-        [Description("List of Library Configuration Structures")]
-        [DisplayName("ccLibsNodeStructs")]
-        public List<LibsNodeStruct> ccLibsNodeStructs { get; set; }
-    }    
-    public class SolutionNodeStruct
-    {
-        [Category("Compute Solution Configuration")]
-        [Description("List of Application Configuration Structures")]
-        [DisplayName("applicationNodeStructs")]
-        public List<ApplicationNodeStruct> applicationNodeStructs { get; set; }
-        [Category("Compute Solution Configuration")]
-        [Description("List of Platform Configuration Structures")]
-        [DisplayName("platformNodeStructs")]
-        public List<PlatformNodeStruct> platformNodeStructs { get; set; }
-    }
-
     /// <summary>
     /// Repository Node Structure
     /// the Data Structure for repository nodes
@@ -288,7 +215,7 @@ namespace ccLib_netCore
         /// <summary>
         /// Temporary Directory Root for the repomanager
         /// </summary>
-        string tempDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\RepoManager";
+        string tempDir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory) + "\\RepoManager";
         string ConfigReposDir;
         string ReposDir;
         string ReposDirUverseRoot;
@@ -730,62 +657,114 @@ namespace ccLib_netCore
 
             // the application definition
             confSol.applicationNodeStructs.Add(new ApplicationNodeStruct());
+            confSol.applicationNodeStructs[0].applicationName = "Lib_GripperFW";
+            confSol.applicationNodeStructs[0].ccLibsNodeStructs = new List<LibsNodeStruct>();
+            confSol.applicationNodeStructs[0].ccLibsNodeStructs.Add(new LibsNodeStruct());
+            confSol.applicationNodeStructs[0].ccLibsNodeStructs[0].ccOSusing = true;
+
             // the application compute module
             confSol.applicationNodeStructs[0].moduleNodeStructs = new List<ModuleNodeStruct>();
+            confSol.applicationNodeStructs[0].moduleNodeStructs.Add( new ModuleNodeStruct());
             confSol.applicationNodeStructs[0].moduleNodeStructs[0].modname = "iGripperFW";
             confSol.applicationNodeStructs[0].moduleNodeStructs[0].isAPImod = false;
             confSol.applicationNodeStructs[0].moduleNodeStructs[0].isDEVmod = false;
             confSol.applicationNodeStructs[0].moduleNodeStructs[0].isNOosMod = true;
             // the console menu api module
-            confSol.applicationNodeStructs[0].moduleNodeStructs = new List<ModuleNodeStruct>();
+            confSol.applicationNodeStructs[0].moduleNodeStructs.Add(new ModuleNodeStruct());
             confSol.applicationNodeStructs[0].moduleNodeStructs[1].modname = "MenuAPI_iGripperFW";
             confSol.applicationNodeStructs[0].moduleNodeStructs[1].isAPImod = true;
             confSol.applicationNodeStructs[0].moduleNodeStructs[1].isDEVmod = false;
             confSol.applicationNodeStructs[0].moduleNodeStructs[1].isNOosMod = true;
             // the packets interface api module
-            confSol.applicationNodeStructs[0].moduleNodeStructs = new List<ModuleNodeStruct>();
+            confSol.applicationNodeStructs[0].moduleNodeStructs.Add(new ModuleNodeStruct());
             confSol.applicationNodeStructs[0].moduleNodeStructs[2].modname = "PacksAPI_iGripperFW";
             confSol.applicationNodeStructs[0].moduleNodeStructs[2].isAPImod = true;
             confSol.applicationNodeStructs[0].moduleNodeStructs[2].isDEVmod = false;
             confSol.applicationNodeStructs[0].moduleNodeStructs[2].isNOosMod = true;
             // the suction device module
-            confSol.applicationNodeStructs[0].moduleNodeStructs = new List<ModuleNodeStruct>();
+            confSol.applicationNodeStructs[0].moduleNodeStructs.Add(new ModuleNodeStruct());
             confSol.applicationNodeStructs[0].moduleNodeStructs[3].modname = "SuctionDEV_iGripperFW";
             confSol.applicationNodeStructs[0].moduleNodeStructs[3].isAPImod = false;
             confSol.applicationNodeStructs[0].moduleNodeStructs[3].isDEVmod = true;
             confSol.applicationNodeStructs[0].moduleNodeStructs[3].isNOosMod = true;
             // the smart motors device module
-            confSol.applicationNodeStructs[0].moduleNodeStructs = new List<ModuleNodeStruct>();
+            confSol.applicationNodeStructs[0].moduleNodeStructs.Add(new ModuleNodeStruct());
             confSol.applicationNodeStructs[0].moduleNodeStructs[4].modname = "SmartMotorsDEV_iGripperFW";
             confSol.applicationNodeStructs[0].moduleNodeStructs[4].isAPImod = false;
             confSol.applicationNodeStructs[0].moduleNodeStructs[4].isDEVmod = true;
             confSol.applicationNodeStructs[0].moduleNodeStructs[4].isNOosMod = true;
             // the libraries configuration for the application
             confSol.applicationNodeStructs[0].ccLibsNodeStructs = new List<LibsNodeStruct>();
-            confSol.applicationNodeStructs[0].ccLibsNodeStructs[0].ccOSusing = false;
-
-
-
-
-
-
+            confSol.applicationNodeStructs[0].ccLibsNodeStructs.Add(new LibsNodeStruct());
+            confSol.applicationNodeStructs[0].ccLibsNodeStructs[0].ccOSusing = true;
 
 
             // Create Temp Directory for New Solution if it does'nt exist
-            if(!Directory.Exists(Path.Combine(tempDir,"\\newSolution")))
+            if (!Directory.Exists(tempDir))
             {
-                Directory.CreateDirectory(Path.Combine(tempDir, "\\newSolution"));
+                Directory.CreateDirectory(tempDir);
             }
-            else // Delete the contents of the directory otherwise
-            {
-                DeleteFilesAndFoldersRecursively(Path.Combine(tempDir, "\\newSolution"));
+            if (Directory.Exists(tempDir+"\\newSolution"))
+            {                
+                DeleteFilesAndFoldersRecursively(tempDir+"\\newSolution");
             }
+            Directory.CreateDirectory(tempDir + "\\newSolution");
 
             // Populate Temp Directory with Libs
 
             // libs - pull / clone ??
+            bool gitccOS = false;
+            bool gitccNOos = false;
+            ExtProcCmdStruct thisCmd = new ExtProcCmdStruct();
+            if (confSol.applicationNodeStructs[0].ccLibsNodeStructs!=null)
+            {
+                if(confSol.applicationNodeStructs[0].ccLibsNodeStructs.Count>0)
+                {
+                    gitccNOos = true;
+                    foreach (LibsNodeStruct ls in confSol.applicationNodeStructs[0].ccLibsNodeStructs)
+                        if (ls.ccOSusing)
+                            gitccOS = true;
+                }
+            }
+            if (gitccNOos)
+            {                
+                thisCmd.cmdArguments = "clone -b main https://github.com/InMechaSol/ccNOos.git";
+                thisCmd.timeOutms = 10000;
+                thisCmd.cmdString = IMSConfiguration.Path2GitBin;
+                thisCmd.workingDirString = tempDir + "\\newSolution";
+
+                List<ExtProcCmdStruct> cmdsIn = new List<ExtProcCmdStruct>();
+                cmdsIn.Add(thisCmd);
+                exeSysLink.ThirdPartyTools.executeCMDS(cmdsIn);
+                string ccNOosCloneString = thisCmd.outANDerrorResults;
+            }
+            if (gitccOS)
+            {
+                thisCmd.cmdArguments = "clone -b main https://github.com/InMechaSol/ccOS.git";
+                thisCmd.timeOutms = 10000;
+                thisCmd.cmdString = IMSConfiguration.Path2GitBin;
+                thisCmd.workingDirString = tempDir + "\\newSolution";
+
+                List<ExtProcCmdStruct> cmdsIn = new List<ExtProcCmdStruct>();
+                cmdsIn.Add(thisCmd);
+                exeSysLink.ThirdPartyTools.executeCMDS(cmdsIn);
+                string ccNOosCloneString = thisCmd.outANDerrorResults;
+            }
+
+            // just for now, lets copy the template dirs
+            copyFilesNFoldersRecurrsive(tempDir + "\\newSolution\\ccNOos\\templates\\Lib_GripperFW_Tests", tempDir + "\\newSolution");
 
             // Create Sub Directory(ies) for Application(s)
+            if(confSol.applicationNodeStructs!=null)
+            {
+                if(confSol.applicationNodeStructs.Count>0)
+                {
+                    foreach(ApplicationNodeStruct an in confSol.applicationNodeStructs)
+                    {
+                        ;
+                    }
+                }
+            }
 
             // Populate Application Directoies
 
